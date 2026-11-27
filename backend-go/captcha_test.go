@@ -11,7 +11,6 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"math"
-	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -738,7 +737,6 @@ func TestDecoysClamped(t *testing.T) {
 }
 
 func TestSameRowDecoyPlacement(t *testing.T) {
-	rnd := rand.New(rand.NewSource(1))
 	const (
 		w       = 320
 		pw      = 48
@@ -749,7 +747,7 @@ func TestSameRowDecoyPlacement(t *testing.T) {
 	)
 	trueRect := image.Rect(targetX, targetY, targetX+pw, targetY+ph)
 	pieceRect := image.Rect(pieceX, targetY, pieceX+pw, targetY+ph)
-	x, ok := sameRowDecoyX(rnd, w, targetX, targetY, pw, ph, pieceX, trueRect, pieceRect)
+	x, ok := sameRowDecoyX(w, targetX, targetY, pw, ph, pieceX, 18, 0)
 	if !ok {
 		t.Fatal("320px 画布应能放下同排伪装")
 	}
@@ -762,6 +760,36 @@ func TestSameRowDecoyPlacement(t *testing.T) {
 	}
 	if r.Min.Y != targetY || r.Max.Y != targetY+ph {
 		t.Fatalf("同排伪装 y 不一致: %v", r)
+	}
+}
+
+func TestSameRowDecoySide(t *testing.T) {
+	const (
+		w      = 320
+		pw     = 48
+		ph     = 48
+		pieceX = 14
+		py     = 40
+	)
+	cases := []struct {
+		side    int
+		targetX int
+		left    bool
+	}{
+		{0, 180, true},
+		{1, 140, false},
+	}
+	for _, tc := range cases {
+		x, ok := sameRowDecoyX(w, tc.targetX, py, pw, ph, pieceX, 18, tc.side)
+		if !ok {
+			t.Fatalf("side=%d 放不下同排伪装", tc.side)
+		}
+		if tc.left && x >= tc.targetX {
+			t.Fatalf("side=0 应放在左侧，target=%d decoy=%d", tc.targetX, x)
+		}
+		if !tc.left && x <= tc.targetX {
+			t.Fatalf("side=1 应放在右侧，target=%d decoy=%d", tc.targetX, x)
+		}
 	}
 }
 

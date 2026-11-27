@@ -79,16 +79,34 @@ func (DefaultGenerator) Generate(_ context.Context, req GenRequest) (*GenResult,
 		pw = ph
 	}
 
-	pieceX := 10 + rnd.Intn(8)
-	minTarget := pieceX + 60 + pw
-	maxTarget := w - pw - 12
-	if minTarget > maxTarget {
-		minTarget = maxTarget
+	decoys := req.Decoys
+	if decoys < 0 {
+		decoys = 0
 	}
-	span := maxTarget - minTarget
-	targetX := minTarget
-	if span > 0 {
-		targetX += rnd.Intn(span + 1)
+	if decoys > 3 {
+		decoys = 3
+	}
+
+	pieceX := 10 + rnd.Intn(8)
+	gap, sameRowSide := 0, -1
+	if decoys > 0 {
+		gap = 18 + rnd.Intn(7)
+		sameRowSide = rnd.Intn(2)
+	}
+	targetX := 0
+	if sameRowSide >= 0 {
+		var ok bool
+		targetX, ok = sameRowTargetX(rnd, w, pw, pieceX, gap, sameRowSide)
+		if !ok {
+			sameRowSide = 1 - sameRowSide
+			targetX, ok = sameRowTargetX(rnd, w, pw, pieceX, gap, sameRowSide)
+		}
+		if !ok {
+			sameRowSide = -1
+		}
+	}
+	if sameRowSide < 0 {
+		targetX = randomTargetX(rnd, pieceX+60+pw, w-pw-12)
 	}
 
 	minY := 12
@@ -112,19 +130,12 @@ func (DefaultGenerator) Generate(_ context.Context, req GenRequest) (*GenResult,
 	trueRect := image.Rect(targetX, targetY, targetX+pw, targetY+ph)
 	pieceRect := image.Rect(pieceX, targetY, pieceX+pw, targetY+ph)
 	holes := []image.Rectangle{trueRect}
-	decoyCount := req.Decoys
-	if decoyCount < 0 {
-		decoyCount = 0
-	}
-	if decoyCount > 3 {
-		decoyCount = 3
-	}
 	actualDecoys := 0
-	remaining := decoyCount
+	remaining := decoys
 
 	// 同排假缺口：同一行、同尺寸，轮廓轻微变化，颜色取各自位置的背景。
-	if remaining > 0 {
-		if dx, ok := sameRowDecoyX(rnd, w, targetX, targetY, pw, ph, pieceX, trueRect, pieceRect); ok {
+	if remaining > 0 && sameRowSide >= 0 {
+		if dx, ok := sameRowDecoyX(w, targetX, targetY, pw, ph, pieceX, gap, sameRowSide); ok {
 			decoyMask := rasterPolygon(pw, ph, perturbPolygon(maskPts, pw, ph, rnd))
 			drawHole(bg, decoyMask, dx, targetY, pw, ph, style, rnd)
 			holes = append(holes, image.Rect(dx, targetY, dx+pw, targetY+ph))
@@ -396,37 +407,63 @@ func cutPiece(src *image.NRGBA, mask []uint8, tx, ty, pw, ph int) *image.NRGBA {
 	return dst
 }
 
-func sameRowDecoyX(rnd *rand.Rand, w, targetX, targetY, pw, ph, pieceX int, trueRect, pieceRect image.Rectangle) (int, bool) {
+func sameRowDecoyX(w, targetX, targetY, pw, ph, pieceX, gap, side int) (int, bool) {
 	if pw <= 0 || ph <= 0 || w <= 0 {
 		return 0, false
 	}
-	gap := 18 + rnd.Intn(7)
-	candidates := make([]int, 0, 2)
+	trueRect := image.Rect(targetX, targetY, targetX+pw, targetY+ph)
+	pieceRect := image.Rect(pieceX, targetY, pieceX+pw, targetY+ph)
 
-	right := targetX + pw + gap
-	if right+pw+8 <= w {
-		candidates = append(candidates, right)
-	}
-	left := targetX - pw - gap
-	if left >= pieceX+pw+8 {
-		candidates = append(candidates, left)
-	}
-	if len(candidates) == 0 {
-		return 0, false
-	}
-	if len(candidates) == 2 && rnd.Intn(2) == 0 {
-		candidates[0], candidates[1] = candidates[1], candidates[0]
-	}
-
-	for _, x := range candidates {
+	try := func(x int) (int, bool) {
+		if x < 8 || x+pw+8 > w {
+			return 0, false
+		}
 		r := image.Rect(x, targetY, x+pw, targetY+ph)
 		inflated := image.Rect(r.Min.X-8, r.Min.Y-8, r.Max.X+8, r.Max.Y+8)
 		if inflated.Overlaps(trueRect) || inflated.Overlaps(pieceRect) {
-			continue
+			return 0, false
 		}
 		return x, true
 	}
-	return 0, false
+
+	if side == 0 {
+		if x, ok := try(targetX - pw - gap); ok {
+			return x, true
+		}
+	} else {
+		if x, ok := try(targetX + pw + gap); ok {
+			return x, true
+		}
+	}
+	if side == 0 {
+		return try(targetX + pw + gap)
+	}
+	return try(targetX - pw - gap)
+}
+
+func sameRowTargetX(rnd *rand.Rand, w, pw, pieceX, gap, side int) (int, bool) {
+	minTarget := pieceX + 60 + pw
+	maxTarget := w - pw - 12
+	if side == 0 {
+		minTarget = pieceX + 2*pw + gap + 8
+	} else {
+		maxTarget = w - 2*pw - gap - 8
+	}
+	if minTarget > maxTarget {
+		return 0, false
+	}
+	return randomTargetX(rnd, minTarget, maxTarget), true
+}
+
+func randomTargetX(rnd *rand.Rand, minTarget, maxTarget int) int {
+	if minTarget > maxTarget {
+		minTarget = maxTarget
+	}
+	x := minTarget
+	if span := maxTarget - minTarget; span > 0 {
+		x += rnd.Intn(span + 1)
+	}
+	return x
 }
 
 func drawHole(img *image.NRGBA, mask []uint8, tx, ty, pw, ph int, st holeStyle, rnd *rand.Rand) {
