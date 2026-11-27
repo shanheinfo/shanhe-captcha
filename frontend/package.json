@@ -1,0 +1,53 @@
+{
+  "name": "shanhe-captcha-vue",
+  "version": "0.1.1",
+  "description": "Vue 3 滑块验证码组件，配套 github.com/shanheinfo/shanhe-captcha/backend-go 的 Go 服务端",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shanheinfo/shanhe-captcha.git",
+    "directory": "frontend"
+  },
+  "homepage": "https://github.com/shanheinfo/shanhe-captcha#readme",
+  "keywords": [
+    "captcha",
+    "slider-captcha",
+    "vue3",
+    "human-verification",
+    "puzzle-captcha"
+  ],
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/shanhe-captcha-vue.umd.cjs",
+  "module": "./dist/shanhe-captcha-vue.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/shanhe-captcha-vue.js",
+      "require": "./dist/shanhe-captcha-vue.umd.cjs"
+    },
+    "./style.css": "./dist/shanhe-captcha-vue.css"
+  },
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "scripts": {
+    "build": "vite build && node scripts/postbuild.mjs",
+    "build:demo": "vite build --config vite.demo.config.ts",
+    "dev": "vite --config vite.demo.config.ts",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "peerDependencies": {
+    "vue": "^3.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.4",
+    "typescript": "^5.7.3",
+    "vite": "^5.4.19",
+    "vue": "^3.5.46",
+    "vue-tsc": "^2.2.12"
+  }
+}
