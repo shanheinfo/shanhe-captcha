@@ -1,0 +1,17 @@
+.DS_Store
+*.log
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+frontend/demo-dist/
+
+# Local package artifacts
+release/
+preview/
+coverage/
+*.tgz
+
+# Editor settings
+.idea/
+.vscode/
