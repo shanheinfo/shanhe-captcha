@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"image"
 	"image/jpeg"
 	"image/png"
@@ -16,11 +15,9 @@ import (
 	mrand "math/rand"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -188,7 +185,10 @@ func (c *Captcha) createChallenge(r *http.Request) (*Challenge, error) {
 		return nil, err
 	}
 
-	id := randomID(16)
+	id, err := randomID(16)
+	if err != nil {
+		return nil, err
+	}
 	rec := &challengeRecord{
 		ID:           id,
 		AnswerX:      float64(gen.TargetX - gen.PieceX),
@@ -205,8 +205,12 @@ func (c *Captcha) createChallenge(r *http.Request) (*Challenge, error) {
 
 	var powQuestion *PoWQuestion
 	if c.cfg.PoW.Enabled {
-		rec.PoWPrefix = randomID(8)
-		powQuestion = &PoWQuestion{Algo: "sha256", Prefix: rec.PoWPrefix, Bits: c.cfg.PoW.Bits}
+		prefix, err := randomID(8)
+		if err != nil {
+			return nil, err
+		}
+		rec.PoWPrefix = prefix
+		powQuestion = &PoWQuestion{Algo: "sha256", Prefix: prefix, Bits: c.cfg.PoW.Bits}
 	}
 
 	if err := c.put(ctx, challengeKeyPrefix+id, rec, c.cfg.ChallengeTTL+time.Minute); err != nil {
@@ -235,7 +239,10 @@ func (c *Captcha) createChallenge(r *http.Request) (*Challenge, error) {
 
 // 第二道没有图片，只需要把滑块拖到最右。
 func (c *Captcha) newPlainChallenge(ctx context.Context, parent *challengeRecord) (string, error) {
-	id := randomID(16)
+	id, err := randomID(16)
+	if err != nil {
+		return "", err
+	}
 	rec := &challengeRecord{
 		ID:           id,
 		Stage:        "plain",
@@ -298,7 +305,10 @@ func (c *Captcha) consumeTicket(ctx context.Context, ticket, clientKey string) (
 }
 
 func (c *Captcha) issueTicket(ctx context.Context, ch *challengeRecord) (string, error) {
-	id := randomID(16)
+	id, err := randomID(16)
+	if err != nil {
+		return "", err
+	}
 	now := c.now()
 	rec := &ticketRecord{
 		ID:          id,
@@ -365,20 +375,14 @@ func (c *Captcha) emit(e Event) {
 	}
 }
 
-var idSeq uint64
+var randomIDFailed = errors.New("shanhecaptcha: crypto/rand unavailable")
 
-func randomID(nbytes int) string {
+func randomID(nbytes int) (string, error) {
 	b := make([]byte, nbytes)
 	if _, err := rand.Read(b); err != nil {
-		// crypto/rand 失败时，用时间、序号和 PID 混合生成。
-		seq := atomic.AddUint64(&idSeq, 1)
-		h := sha256.Sum256([]byte(fmt.Sprintf("%d|%d|%d", time.Now().UnixNano(), seq, os.Getpid())))
-		if nbytes <= len(h) {
-			return hex.EncodeToString(h[:nbytes])
-		}
-		return hex.EncodeToString(h[:])
+		return "", randomIDFailed
 	}
-	return hex.EncodeToString(b)
+	return hex.EncodeToString(b), nil
 }
 
 func jpegDataURI(img image.Image, quality int) (string, error) {
