@@ -140,7 +140,7 @@ if (res.next === 'plain') {
 
 `fetchChallenge` / `verifyChallenge` 自动带 `X-Captcha-Client`；业务请求用 `captchaClientHeader()` 带上同一个标识。
 
-## 演示站
+## 示例页
 
 ```bash
 cd frontend
@@ -148,7 +148,7 @@ npm install
 npm run build:demo
 ```
 
-构建结果在 `frontend/demo-dist`，Go 后端的 `example` 读取这个目录。演示页包含登录演示、链路观察（真实请求/响应，base64 折叠）、轨迹回放、服务端事件流（`/api/events` SSE）和内嵌接入文档。
+构建结果在 `frontend/demo-dist`，Go 后端的 `example` 读取这个目录。示例页覆盖拖动、校验、票据和登录消费的完整流程。展示站（链路观察、轨迹回放、SSE 事件流、内嵌接入文档）在独立项目 shanhe-captcha-demo 维护，不进本仓库，也不进 npm 包。
 
 开发模式：
 

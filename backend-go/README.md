@@ -237,7 +237,7 @@ cfg.OnEvent = func(e shanhecaptcha.Event) {
 }
 ```
 
-演示站的 `/api/events` 就是用这个回调做的 SSE 推送，可以参考 `example/main.go`。
+展示项目 shanhe-captcha-demo 的 `/api/events` 就是用这个回调做的 SSE 推送；本仓库的 `example` 只保留登录消费票据的示例。
 
 ## 自定义生成器
 
