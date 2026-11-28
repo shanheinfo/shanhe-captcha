@@ -60,7 +60,9 @@ func (s *MemoryStore) Get(_ context.Context, key string) ([]byte, error) {
 		s.mu.Unlock()
 		return nil, ErrStoreNotFound
 	}
-	return it.value, nil
+	cp := make([]byte, len(it.value))
+	copy(cp, it.value)
+	return cp, nil
 }
 
 func (s *MemoryStore) Set(_ context.Context, key string, value []byte, ttl time.Duration) error {

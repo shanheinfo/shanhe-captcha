@@ -920,6 +920,27 @@ func TestMemoryStoreSetAfterClose(t *testing.T) {
 	}
 }
 
+func TestMemoryStoreGetReturnsCopy(t *testing.T) {
+	s := NewMemoryStore()
+	defer s.Close()
+	ctx := context.Background()
+	if err := s.Set(ctx, "k", []byte("original"), time.Minute); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	got, err := s.Get(ctx, "k")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	got[0] = 'X'
+	again, err := s.Get(ctx, "k")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if string(again) != "original" {
+		t.Fatalf("改动 Get 返回值不应影响存储，实际 %q", again)
+	}
+}
+
 func TestRateLimiterEvictsOldestBucket(t *testing.T) {
 	rl := newMemoryRateLimiter(RateLimitConfig{Enabled: true, Burst: 1, RefillPerSecond: 0.001, MaxKeys: 2})
 	now := time.Now()
