@@ -137,7 +137,7 @@ _ = info
 | `MaxBodyBytes` | 128KB | 请求体大小上限 |
 | `MaxConcurrentGenerations` | 自动，最少 4 | 同时生成图片的数量 |
 | `RateLimit` | 8 次突发、0.5/s | 按 IP 段限制请求频率 |
-| `PoW` | 关闭 | 打开后前端要先算一个 nonce |
+| `PoW` | 开启，18 bit | 前端先算一个 nonce 再提交；关掉省客户端 CPU，脚本也不用算 |
 | `AllowOrigins` | 空 | 前后端分开时填前端域名 |
 | `AllowHeaders` | Content-Type、X-Captcha-Client、Authorization | 跨域请求允许的头 |
 | `TrustProxyHeaders` | false | 信任 `X-Forwarded-For` 第一个 IP 和 `X-Real-IP`，要求代理覆盖而不是追加 XFF |

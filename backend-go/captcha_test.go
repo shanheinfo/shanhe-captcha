@@ -27,8 +27,9 @@ func newTestCaptcha(t *testing.T, mutate func(*Config)) (*Captcha, *httptest.Ser
 	cfg.MinSolveDuration = time.Nanosecond
 	cfg.Debug = true
 	cfg.RateLimit.Enabled = false
-	// 大部分用例只看位置和票据，行为评分单独测。
+	// 大部分用例只看位置和票据，行为评分和 PoW 单独测。
 	cfg.Behavior.Enabled = false
+	cfg.PoW.Enabled = false
 	if mutate != nil {
 		mutate(&cfg)
 	}

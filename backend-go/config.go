@@ -21,13 +21,13 @@ type SecondGateConfig struct {
 	Enabled bool
 }
 
-// 可选的工作量证明，让客户端多算一点。
+// PoWConfig 是可选的工作量证明。
 type PoWConfig struct {
 	Enabled bool
 	Bits    int
 }
 
-// 建议从 DefaultConfig() 改；直接 New(Config{}) 时所有开关都是关闭的。
+// 直接 New(Config{}) 时校验开关都是关的，从 DefaultConfig() 改。
 type Config struct {
 	Prefix string
 
@@ -107,7 +107,7 @@ func DefaultConfig() Config {
 			RefillPerSecond: 0.5,
 			MaxKeys:         10000,
 		},
-		PoW:      PoWConfig{Bits: 18},
+		PoW:      PoWConfig{Enabled: true, Bits: 18},
 		Behavior: BehaviorConfig{Enabled: true, MinScore: 45},
 	}
 }
