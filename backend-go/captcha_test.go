@@ -920,6 +920,23 @@ func TestMemoryStoreSetAfterClose(t *testing.T) {
 	}
 }
 
+func TestCloseKeepsExternalStore(t *testing.T) {
+	store := NewMemoryStore()
+	defer store.Close()
+	cfg := DefaultConfig()
+	cfg.Store = store
+	c, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if err := c.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if err := store.Set(context.Background(), "k", []byte("v"), time.Minute); err != nil {
+		t.Fatalf("外部存储不应被关闭: %v", err)
+	}
+}
+
 func TestMemoryStoreGetReturnsCopy(t *testing.T) {
 	s := NewMemoryStore()
 	defer s.Close()

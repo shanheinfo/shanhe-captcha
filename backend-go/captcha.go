@@ -33,6 +33,8 @@ type Captcha struct {
 	store Store
 	rl    RateLimiter
 
+	ownsStore bool
+
 	mu  sync.Mutex
 	rnd *mrand.Rand
 
@@ -44,6 +46,7 @@ type Captcha struct {
 
 // New 创建验证码实例。
 func New(cfg Config) (*Captcha, error) {
+	ownsStore := cfg.Store == nil
 	cfg.normalize()
 
 	proxies, err := parseTrustedProxies(cfg.TrustedProxyCIDRs)
@@ -58,10 +61,11 @@ func New(cfg Config) (*Captcha, error) {
 	}
 
 	c := &Captcha{
-		cfg:   cfg,
-		store: cfg.Store,
-		rnd:   mrand.New(mrand.NewSource(seed)),
-		now:   time.Now,
+		cfg:       cfg,
+		store:     cfg.Store,
+		ownsStore: ownsStore,
+		rnd:       mrand.New(mrand.NewSource(seed)),
+		now:       time.Now,
 	}
 	c.rl = cfg.Limiter
 	c.gen = make(chan struct{}, cfg.MaxConcurrentGenerations)
@@ -74,8 +78,11 @@ func (c *Captcha) Config() Config { return c.cfg }
 // Store 返回存储。
 func (c *Captcha) Store() Store { return c.store }
 
-// Close 释放资源。
+// Close 释放资源。只关闭内部创建的存储，外部传入的由调用方自己关。
 func (c *Captcha) Close() error {
+	if !c.ownsStore {
+		return nil
+	}
 	if m, ok := c.store.(*MemoryStore); ok {
 		return m.Close()
 	}
