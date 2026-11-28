@@ -67,6 +67,7 @@ type Config struct {
 	AllowHeaders []string
 
 	RateLimit  RateLimitConfig
+	Limiter    RateLimiter
 	PoW        PoWConfig
 	Behavior   BehaviorConfig
 	SecondGate SecondGateConfig
@@ -190,6 +191,9 @@ func (c *Config) normalize() {
 	}
 	if c.RateLimit.MaxKeys <= 0 {
 		c.RateLimit.MaxKeys = 10000
+	}
+	if c.Limiter == nil {
+		c.Limiter = newMemoryRateLimiter(c.RateLimit)
 	}
 	if c.PoW.Enabled && c.PoW.Bits <= 0 {
 		c.PoW.Bits = 18

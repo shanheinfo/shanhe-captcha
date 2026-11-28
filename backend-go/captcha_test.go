@@ -314,6 +314,45 @@ func TestRateLimit(t *testing.T) {
 	}
 }
 
+type countingLimiter struct {
+	calls int
+	deny  bool
+}
+
+func (l *countingLimiter) Allow(string) bool {
+	l.calls++
+	return !l.deny
+}
+
+func TestCustomRateLimiter(t *testing.T) {
+	lim := &countingLimiter{}
+	_, srv := newTestCaptcha(t, func(cfg *Config) {
+		cfg.Limiter = lim
+	})
+	for i := 0; i < 2; i++ {
+		resp, err := srv.Client().Get(srv.URL + "/captcha/challenge")
+		if err != nil {
+			t.Fatalf("GET: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != 200 {
+			t.Fatalf("自定义限流器放行时应当 200，实际 %d", resp.StatusCode)
+		}
+	}
+	if lim.calls != 2 {
+		t.Fatalf("限流器应被调用 2 次，实际 %d", lim.calls)
+	}
+	lim.deny = true
+	resp, err := srv.Client().Get(srv.URL + "/captcha/challenge")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("限流器拒绝时应当 429，实际 %d", resp.StatusCode)
+	}
+}
+
 func TestTicketGuard(t *testing.T) {
 	c, srv := newTestCaptcha(t, nil)
 	ch := getChallenge(t, srv)
@@ -885,11 +924,11 @@ func TestMemoryStoreSetAfterClose(t *testing.T) {
 }
 
 func TestRateLimiterEvictsOldestBucket(t *testing.T) {
-	rl := newRateLimiter(RateLimitConfig{Enabled: true, Burst: 1, RefillPerSecond: 0.001, MaxKeys: 2})
+	rl := newMemoryRateLimiter(RateLimitConfig{Enabled: true, Burst: 1, RefillPerSecond: 0.001, MaxKeys: 2})
 	now := time.Now()
 	rl.buckets["old"] = &tokenBucket{tokens: 1, last: now.Add(-time.Minute), seen: now.Add(-time.Minute)}
 	rl.buckets["new"] = &tokenBucket{tokens: 1, last: now, seen: now}
-	if !rl.allow("third") {
+	if !rl.Allow("third") {
 		t.Fatal("新 key 应拿到令牌")
 	}
 	if _, ok := rl.buckets["old"]; ok {

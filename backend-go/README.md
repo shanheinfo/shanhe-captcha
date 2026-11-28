@@ -137,6 +137,7 @@ _ = info
 | `MaxBodyBytes` | 128KB | 请求体大小上限 |
 | `MaxConcurrentGenerations` | 自动，最少 4 | 同时生成图片的数量 |
 | `RateLimit` | 8 次突发、0.5/s | 按 IP 段限制请求频率 |
+| `Limiter` | 进程内令牌桶 | 自定义限流器，多实例接共享存储 |
 | `PoW` | 开启，18 bit | 前端先算一个 nonce 再提交；关掉省客户端 CPU，脚本也不用算 |
 | `AllowOrigins` | 空 | 前后端分开时填前端域名 |
 | `AllowHeaders` | Content-Type、X-Captcha-Client、Authorization | 跨域请求允许的头 |
@@ -173,6 +174,18 @@ func (s redisStore) Take(ctx context.Context, key string) ([]byte, error) {
 ```
 
 `TakeStore` 是可选接口。实现 `Take` 后，读取和删除一次完成；不实现也能跑，但同时消费同一张凭证时会有小概率重复。
+
+## 多实例限流
+
+默认限流在进程内，多副本各算各的。实现 `RateLimiter` 后通过 `Config.Limiter` 传入：
+
+```go
+type RateLimiter interface {
+    Allow(key string) bool
+}
+```
+
+key 带动作前缀：拉挑战是 `ch:<IP 段>`，校验是 `vf:<IP 段>`。
 
 ## 演示和测试
 

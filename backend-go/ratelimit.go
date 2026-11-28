@@ -6,7 +6,13 @@ import (
 	"time"
 )
 
-type rateLimiter struct {
+// RateLimiter 按 key 限流。key 形如 "ch:1.2.3.0/24"（拉挑战）或 "vf:1.2.3.0/24"（校验）。
+// 默认是进程内令牌桶，多实例部署时换成共享存储的实现，通过 Config.Limiter 传入。
+type RateLimiter interface {
+	Allow(key string) bool
+}
+
+type memoryRateLimiter struct {
 	cfg RateLimitConfig
 
 	mu      sync.Mutex
@@ -19,17 +25,17 @@ type tokenBucket struct {
 	seen   time.Time
 }
 
-func newRateLimiter(cfg RateLimitConfig) *rateLimiter {
+func newMemoryRateLimiter(cfg RateLimitConfig) *memoryRateLimiter {
 	if !cfg.Enabled {
-		return &rateLimiter{cfg: cfg}
+		return &memoryRateLimiter{cfg: cfg}
 	}
-	return &rateLimiter{
+	return &memoryRateLimiter{
 		cfg:     cfg,
 		buckets: make(map[string]*tokenBucket),
 	}
 }
 
-func (rl *rateLimiter) allow(key string) bool {
+func (rl *memoryRateLimiter) Allow(key string) bool {
 	if !rl.cfg.Enabled {
 		return true
 	}
@@ -66,7 +72,7 @@ func (rl *rateLimiter) allow(key string) bool {
 	return true
 }
 
-func (rl *rateLimiter) sweepLocked(now time.Time) {
+func (rl *memoryRateLimiter) sweepLocked(now time.Time) {
 	for k, b := range rl.buckets {
 		if now.Sub(b.seen) > 10*time.Minute {
 			delete(rl.buckets, k)
@@ -74,7 +80,7 @@ func (rl *rateLimiter) sweepLocked(now time.Time) {
 	}
 }
 
-func (rl *rateLimiter) evictOldestLocked() {
+func (rl *memoryRateLimiter) evictOldestLocked() {
 	var oldestKey string
 	var oldest time.Time
 	for k, b := range rl.buckets {

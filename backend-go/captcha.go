@@ -31,7 +31,7 @@ const (
 type Captcha struct {
 	cfg   Config
 	store Store
-	rl    *rateLimiter
+	rl    RateLimiter
 
 	mu  sync.Mutex
 	rnd *mrand.Rand
@@ -63,7 +63,7 @@ func New(cfg Config) (*Captcha, error) {
 		rnd:   mrand.New(mrand.NewSource(seed)),
 		now:   time.Now,
 	}
-	c.rl = newRateLimiter(cfg.RateLimit)
+	c.rl = cfg.Limiter
 	c.gen = make(chan struct{}, cfg.MaxConcurrentGenerations)
 	return c, nil
 }
