@@ -148,8 +148,8 @@ func (DefaultGenerator) Generate(_ context.Context, req GenRequest) (*GenResult,
 		var dx, dy int
 		ok := false
 		for tries := 0; tries < 48; tries++ {
-			dx = 12 + rnd.Intn(maxInt(1, w-pw-24))
-			dy = 12 + rnd.Intn(maxInt(1, h-ph-24))
+			dx = 12 + rnd.Intn(max(1, w-pw-24))
+			dy = 12 + rnd.Intn(max(1, h-ph-24))
 			r := image.Rect(dx, dy, dx+pw, dy+ph)
 			if tries < 32 && !(r.Min.Y < targetY-8 || r.Max.Y > targetY+ph+8) {
 				continue
@@ -242,7 +242,7 @@ func paintBackground(rnd *rand.Rand, w, h int) *image.NRGBA {
 	}
 
 	for i := 0; i < 18+rnd.Intn(14); i++ {
-		radius := 8 + rnd.Float64()*float64(minInt(w, h))*0.42
+		radius := 8 + rnd.Float64()*float64(min(w, h))*0.42
 		cx := rnd.Float64() * float64(w)
 		cy := rnd.Float64() * float64(h)
 		col := hsv(math.Mod(hue+(rnd.Float64()-0.5)*140+360, 360), 0.26+rnd.Float64()*0.38, 0.74+rnd.Float64()*0.24)
@@ -970,18 +970,4 @@ func clamp8(v int) int {
 		return 255
 	}
 	return v
-}
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

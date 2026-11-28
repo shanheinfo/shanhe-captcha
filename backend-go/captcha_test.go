@@ -151,7 +151,6 @@ func TestFullFlow(t *testing.T) {
 	res := postVerify(t, srv, VerifyRequest{
 		ID:       ch.ID,
 		X:        answer,
-		Duration: 500,
 		Trail:    makeTrail(answer, 20),
 	})
 	if !res.OK {
@@ -182,7 +181,6 @@ func TestWrongPositionFails(t *testing.T) {
 	res := postVerify(t, srv, VerifyRequest{
 		ID:       ch.ID,
 		X:        answer + 30,
-		Duration: 500,
 		Trail:    makeTrail(answer+30, 20),
 	})
 	if res.OK || res.Code != CodeMismatch {
@@ -193,7 +191,6 @@ func TestWrongPositionFails(t *testing.T) {
 	res2 := postVerify(t, srv, VerifyRequest{
 		ID:       ch.ID,
 		X:        answer,
-		Duration: 600,
 		Trail:    makeTrail(answer, 20),
 	})
 	if res2.OK || res2.Code != CodeInvalid {
@@ -588,7 +585,7 @@ func TestDefaultBodyLimitFitsMaxTrail(t *testing.T) {
 	for i := range tr {
 		tr[i] = TrailPoint{T: int64(i * 8), X: float64(i) * 0.1234, Y: 0.5}
 	}
-	body, err := json.Marshal(VerifyRequest{ID: "x", X: 123.45, Duration: 9999, Trail: tr})
+	body, err := json.Marshal(VerifyRequest{ID: "x", X: 123.45, Trail: tr})
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}

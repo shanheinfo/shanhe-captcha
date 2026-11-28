@@ -74,8 +74,7 @@ func (c *Captcha) verify(ctx context.Context, r *http.Request, req *VerifyReques
 		score, notes = c.scoreBehavior(req.Trail, req.Behavior)
 		if score < c.cfg.Behavior.MinScore {
 			c.penalize(ctx, key, &rec)
-			c.emit(Event{Kind: "failure", ChallengeID: rec.ID, ClientKey: rec.ClientKey, Reason: CodeBehavior, Elapsed: elapsed, At: now})
-			_ = notes
+			c.emit(Event{Kind: "failure", ChallengeID: rec.ID, ClientKey: rec.ClientKey, Reason: CodeBehavior, Notes: notes, Elapsed: elapsed, At: now})
 			return &VerifyResult{OK: false, Code: CodeBehavior, Score: score}
 		}
 	}
