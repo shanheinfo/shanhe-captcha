@@ -1,7 +1,5 @@
 // Command attacksim 用几种简单方法找缺口，输出命中率。
 //
-// 它只代表低成本脚本的基线，不是完整的安全测试。
-//
 //	go run ./cmd/attacksim -n 60 -decoys 3
 package main
 

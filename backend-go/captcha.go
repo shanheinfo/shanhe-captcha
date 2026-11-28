@@ -234,7 +234,7 @@ func (c *Captcha) createChallenge(r *http.Request) (*Challenge, error) {
 	if err != nil {
 		return nil, err
 	}
-	pieceURI, err := pngDataURI(gen.Piece)
+	pieceURI, err := pngDataURI(softenPiece(gen.Piece, mrand.New(mrand.NewSource(seed^0x9e3779b9))))
 	if err != nil {
 		return nil, err
 	}
