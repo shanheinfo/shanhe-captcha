@@ -616,7 +616,7 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   pointer-events: none;
 }
 
-.shc-header {
+.shc-root .shc-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -624,7 +624,7 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   margin-bottom: 10px;
 }
 
-.shc-title {
+.shc-root .shc-title {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -634,7 +634,7 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   letter-spacing: 0.2px;
 }
 
-.shc-icon {
+.shc-root .shc-icon {
   width: 15px;
   height: 15px;
   fill: none;
@@ -644,7 +644,7 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   stroke-linejoin: round;
 }
 
-.shc-refresh {
+.shc-root .shc-refresh {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -659,17 +659,17 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   transition: background 0.16s ease, color 0.16s ease;
 }
 
-.shc-refresh:hover:not(:disabled) {
+.shc-root .shc-refresh:hover:not(:disabled) {
   background: var(--shc-accent-soft);
   color: var(--shc-accent);
 }
 
-.shc-refresh:disabled {
+.shc-root .shc-refresh:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
 
-.shc-refresh svg {
+.shc-root .shc-refresh svg {
   width: 16px;
   height: 16px;
   fill: none;
@@ -679,11 +679,11 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   stroke-linejoin: round;
 }
 
-.shc-refresh.spinning svg {
+.shc-root .shc-refresh.spinning svg {
   animation: shc-spin 0.9s linear infinite;
 }
 
-.shc-frame {
+.shc-root .shc-frame {
   position: relative;
   width: 100%;
   border-radius: 10px;
@@ -692,7 +692,7 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
 }
 
-.shc-bg {
+.shc-root .shc-bg {
   display: block;
   width: 100%;
   height: 100%;
@@ -700,7 +700,7 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   pointer-events: none;
 }
 
-.shc-piece {
+.shc-root .shc-piece {
   position: absolute;
   top: 0;
   left: 0;
@@ -717,7 +717,7 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   transition: none;
 }
 
-.shc-layer {
+.shc-root .shc-layer {
   position: absolute;
   inset: 0;
   display: flex;
@@ -727,16 +727,16 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   z-index: 3;
 }
 
-.shc-layer-loading {
+.shc-root .shc-layer-loading {
   background: rgba(240, 243, 247, 0.72);
   backdrop-filter: blur(2px);
 }
 
-.shc-theme-dark .shc-layer-loading {
+.shc-root.shc-theme-dark .shc-layer-loading {
   background: rgba(23, 28, 35, 0.7);
 }
 
-.shc-spinner {
+.shc-root .shc-spinner {
   width: 22px;
   height: 22px;
   border-radius: 50%;
@@ -745,17 +745,17 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   animation: shc-spin 0.8s linear infinite;
 }
 
-.shc-layer-success {
+.shc-root .shc-layer-success {
   flex-direction: column;
   background: rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(2px);
 }
 
-.shc-theme-dark .shc-layer-success {
+.shc-root.shc-theme-dark .shc-layer-success {
   background: rgba(23, 28, 35, 0.78);
 }
 
-.shc-check {
+.shc-root .shc-check {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -766,7 +766,7 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   box-shadow: 0 4px 12px rgba(22, 163, 74, 0.35);
 }
 
-.shc-check svg {
+.shc-root .shc-check svg {
   width: 20px;
   height: 20px;
   fill: none;
@@ -779,20 +779,20 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   animation: shc-draw 0.32s ease forwards 0.08s;
 }
 
-.shc-success-text {
+.shc-root .shc-success-text {
   font-size: 13px;
   font-weight: 500;
   color: var(--shc-success);
 }
 
-.shc-layer-error {
+.shc-root .shc-layer-error {
   flex-direction: column;
   gap: 6px;
   font-size: 12px;
   color: var(--shc-text-2);
 }
 
-.shc-plain-panel {
+.shc-root .shc-plain-panel {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -807,11 +807,11 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.05);
 }
 
-.shc-theme-dark .shc-plain-panel {
+.shc-root.shc-theme-dark .shc-plain-panel {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
-.shc-plain-icon {
+.shc-root .shc-plain-icon {
   width: 34px;
   height: 34px;
   fill: none;
@@ -822,12 +822,12 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   opacity: 0.9;
 }
 
-.shc-plain-title {
+.shc-root .shc-plain-title {
   font-size: 13px;
   color: var(--shc-text-2);
 }
 
-.shc-plain-error {
+.shc-root .shc-plain-error {
   max-width: 240px;
   font-size: 12px;
   line-height: 1.5;
@@ -835,7 +835,7 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   text-align: center;
 }
 
-.shc-track {
+.shc-root .shc-track {
   position: relative;
   height: 44px;
   margin-top: 10px;
@@ -845,11 +845,11 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.05);
 }
 
-.shc-theme-dark .shc-track {
+.shc-root.shc-theme-dark .shc-track {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
-.shc-track-fill {
+.shc-root .shc-track-fill {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -858,11 +858,11 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   transition: width 0.1s linear;
 }
 
-.shc-track.success .shc-track-fill {
+.shc-root .shc-track.success .shc-track-fill {
   background: linear-gradient(90deg, rgba(22, 163, 74, 0.22), rgba(22, 163, 74, 0.04));
 }
 
-.shc-track-text {
+.shc-root .shc-track-text {
   position: absolute;
   inset: 0;
   display: flex;
@@ -874,7 +874,7 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   pointer-events: none;
 }
 
-.shc-handle {
+.shc-root .shc-handle {
   position: absolute;
   top: 0;
   left: 0;
@@ -893,15 +893,15 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.16s ease;
 }
 
-.shc-theme-dark .shc-handle {
+.shc-root.shc-theme-dark .shc-handle {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
-.shc-handle:hover {
+.shc-root .shc-handle:hover {
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.26), inset 0 0 0 1px rgba(37, 99, 235, 0.24);
 }
 
-.shc-handle:focus-visible {
+.shc-root .shc-handle:focus-visible {
   box-shadow: 0 0 0 3px var(--shc-accent-soft), inset 0 0 0 1px var(--shc-accent);
 }
 
@@ -910,7 +910,7 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   transition: none;
 }
 
-.shc-handle-icon {
+.shc-root .shc-handle-icon {
   width: 18px;
   height: 18px;
   fill: none;
@@ -920,12 +920,12 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
   stroke-linejoin: round;
 }
 
-.shc-track.success .shc-handle {
+.shc-root .shc-track.success .shc-handle {
   cursor: default;
   box-shadow: 0 2px 10px rgba(22, 163, 74, 0.28), inset 0 0 0 1px rgba(22, 163, 74, 0.3);
 }
 
-.shc-track.success .shc-handle-icon {
+.shc-root .shc-track.success .shc-handle-icon {
   stroke: var(--shc-success);
 }
 
@@ -967,11 +967,11 @@ defineExpose({ refresh, reset, getTicket: () => ticket.value })
 
 @media (prefers-reduced-motion: reduce) {
   .shc-root,
-  .shc-handle,
-  .shc-piece,
-  .shc-track-fill,
-  .shc-check svg,
-  .shc-refresh.spinning svg {
+  .shc-root .shc-handle,
+  .shc-root .shc-piece,
+  .shc-root .shc-track-fill,
+  .shc-root .shc-check svg,
+  .shc-root .shc-refresh.spinning svg {
     animation: none !important;
     transition: none !important;
   }
