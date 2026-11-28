@@ -81,7 +81,6 @@ _ = info
 {
   "id": "b55fc28f…",
   "x": 181.6,
-  "duration": 842,
   "trail": [
     { "t": 0, "x": 0, "y": 0 },
     { "t": 16, "x": 12.4, "y": 0 }
@@ -137,10 +136,12 @@ _ = info
 | `MaxBodyBytes` | 128KB | 请求体大小上限 |
 | `MaxConcurrentGenerations` | 自动，最少 4 | 同时生成图片的数量 |
 | `RateLimit` | 8 次突发、0.5/s | 按 IP 段限制请求频率 |
-| `PoW` | 关闭 | 打开后前端要先算一个 nonce |
+| `Limiter` | 进程内令牌桶 | 自定义限流器，多实例接共享存储 |
+| `PoW` | 开启，18 bit | 前端先算一个 nonce 再提交；关掉省客户端 CPU，脚本也不用算 |
 | `AllowOrigins` | 空 | 前后端分开时填前端域名 |
 | `AllowHeaders` | Content-Type、X-Captcha-Client、Authorization | 跨域请求允许的头 |
-| `TrustProxyHeaders` | false | 只有服务在可信反向代理后面时才开 |
+| `TrustProxyHeaders` | false | 信任 `X-Forwarded-For` 第一个 IP 和 `X-Real-IP`，要求代理覆盖而不是追加 XFF |
+| `TrustedProxyCIDRs` | 空 | 可信代理网段。填了以后只信这些网段发来的 XFF，从右往左取第一个非可信 IP |
 | `Debug` | false | 失败时返回具体原因 |
 
 ## 更换存储
@@ -173,6 +174,18 @@ func (s redisStore) Take(ctx context.Context, key string) ([]byte, error) {
 
 `TakeStore` 是可选接口。实现 `Take` 后，读取和删除一次完成；不实现也能跑，但同时消费同一张凭证时会有小概率重复。
 
+## 多实例限流
+
+默认限流在进程内，多副本各算各的。实现 `RateLimiter` 后通过 `Config.Limiter` 传入：
+
+```go
+type RateLimiter interface {
+    Allow(key string) bool
+}
+```
+
+key 带动作前缀：拉挑战是 `ch:<IP 段>`，校验是 `vf:<IP 段>`。
+
 ## 演示和测试
 
 ```bash
@@ -190,22 +203,25 @@ go run ./cmd/preview -n 6 -decoys 3
 go run ./cmd/attacksim -n 60 -decoys 3
 ```
 
-`attacksim` 用四种简单方法找缺口，结果只用来观察生成器：
+`attacksim` 用四种简单方法在生成器输出上找缺口，命中率：
 
 | 方法 | 无假缺口 | `Decoys=3` |
 | --- | --- | --- |
-| 最暗窗口 | 0% | 3% |
+| 最暗窗口 | 7% | 2% |
 | 最低方差窗口 | 0% | 0% |
-| 邻域差异最大窗口 | 12% | 3% |
-| 碎片模板匹配 | 58% | 47% |
-| 四种取一 | 60% | 53% |
+| 邻域差异最大窗口 | 33% | 8% |
+| 碎片模板匹配 | 0% | 1% |
+| 四种取一 | 36% | 10% |
+
+缺口内部的纹理从远处采样，碎片下发前还会经过 `softenPiece`（亚像素形变、模糊、色偏），两者都不再携带缺口位置的原始像素。`go test -run TestPieceTemplateMatchRate -v` 看的是下发碎片的模板命中率。
 
 ## 已知限制
 
-- 碎片本身就是缺口的模板。`Decoys=3` 时模板匹配仍有约 47% 命中，假缺口只能降低单次匹配的确定性。
+- `Decoys=3` 时四种方法取一约 10%，本质是在 4 个缺口里猜。靠每个挑战只能校验一次和 IP 限流压。
 - 轨迹和行为数据都由前端提交，可以伪造。服务端只能做一致性检查。
 - 第二道无图滑块没有图片答案，但仍然依赖位置、轨迹和行为信号。
 - 多实例必须共用存储；没有实现 `TakeStore` 时，并发消费存在小窗口。
+- 限流器默认在进程内，多实例部署要自己实现 `RateLimiter` 接共享存储。
 
 ## 协议
 

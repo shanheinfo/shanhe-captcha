@@ -8,6 +8,7 @@ type Event struct {
 	ChallengeID string
 	ClientKey   string
 	Reason      string
+	Notes       []string
 	IP          string
 	Elapsed     time.Duration
 	At          time.Time
@@ -51,7 +52,6 @@ type VerifyRequest struct {
 	ID       string           `json:"id"`
 	X        float64          `json:"x"`
 	Y        float64          `json:"y,omitempty"`
-	Duration int64            `json:"duration"`
 	Trail    []TrailPoint     `json:"trail,omitempty"`
 	Nonce    string           `json:"nonce,omitempty"`
 	Behavior *BehaviorSignals `json:"behavior,omitempty"`

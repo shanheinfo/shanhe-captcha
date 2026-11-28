@@ -2,6 +2,7 @@ package shanhecaptcha
 
 import (
 	"log/slog"
+	"net"
 	"runtime"
 	"strings"
 	"time"
@@ -20,13 +21,13 @@ type SecondGateConfig struct {
 	Enabled bool
 }
 
-// 可选的工作量证明，让客户端多算一点。
+// PoWConfig 是可选的工作量证明。
 type PoWConfig struct {
 	Enabled bool
 	Bits    int
 }
 
-// 建议从 DefaultConfig() 改；直接 New(Config{}) 时所有开关都是关闭的。
+// 直接 New(Config{}) 时校验开关都是关的，从 DefaultConfig() 改。
 type Config struct {
 	Prefix string
 
@@ -49,6 +50,9 @@ type Config struct {
 	ClientIPPrefixV4  int
 	ClientIPPrefixV6  int
 	TrustProxyHeaders bool
+	// TrustedProxyCIDRs 非空时只信任这些网段发来的 X-Forwarded-For，
+	// 从右往左取第一个不在网段内的 IP，此时 TrustProxyHeaders 不生效。
+	TrustedProxyCIDRs []string
 
 	VerifyTrail     bool
 	MinTrailPoints  int
@@ -63,6 +67,7 @@ type Config struct {
 	AllowHeaders []string
 
 	RateLimit  RateLimitConfig
+	Limiter    RateLimiter
 	PoW        PoWConfig
 	Behavior   BehaviorConfig
 	SecondGate SecondGateConfig
@@ -73,6 +78,8 @@ type Config struct {
 	Logger  *slog.Logger
 	Debug   bool
 	OnEvent func(Event)
+
+	trustedProxies []*net.IPNet
 }
 
 func DefaultConfig() Config {
@@ -101,7 +108,7 @@ func DefaultConfig() Config {
 			RefillPerSecond: 0.5,
 			MaxKeys:         10000,
 		},
-		PoW:      PoWConfig{Bits: 18},
+		PoW:      PoWConfig{Enabled: true, Bits: 18},
 		Behavior: BehaviorConfig{Enabled: true, MinScore: 45},
 	}
 }
@@ -184,6 +191,9 @@ func (c *Config) normalize() {
 	}
 	if c.RateLimit.MaxKeys <= 0 {
 		c.RateLimit.MaxKeys = 10000
+	}
+	if c.Limiter == nil {
+		c.Limiter = newMemoryRateLimiter(c.RateLimit)
 	}
 	if c.PoW.Enabled && c.PoW.Bits <= 0 {
 		c.PoW.Bits = 18

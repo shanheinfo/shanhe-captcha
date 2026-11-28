@@ -2,7 +2,7 @@ package shanhecaptcha
 
 import "math"
 
-// 前端传来的拖动信号。字段可以伪造，只用来辅助判断。
+// BehaviorSignals 是前端上报的拖动信号。
 // Events 是事件数，Trusted 是真实事件数，Coalesced 是合并后的采样数，Keyboard 是键盘操作。
 type BehaviorSignals struct {
 	PointerType string `json:"pointerType,omitempty"`
@@ -20,13 +20,11 @@ type BehaviorConfig struct {
 	StrictKeyboard bool
 }
 
-// 计算一次拖动的分数。
 func (c *Captcha) scoreBehavior(trail []TrailPoint, sig *BehaviorSignals) (int, []string) {
 	if !c.cfg.Behavior.Enabled {
 		return 100, nil
 	}
 	if sig != nil && sig.Keyboard && !c.cfg.Behavior.StrictKeyboard {
-		// 键盘没有指针轨迹，默认跳过评分。
 		return 100, []string{"keyboard_bypass"}
 	}
 
@@ -79,7 +77,7 @@ func (c *Captcha) scoreBehavior(trail []TrailPoint, sig *BehaviorSignals) (int, 
 		sumDT2 += dt * dt
 
 		if i >= 3 {
-			dv1 := math.Hypot(trail[i-1].X-trail[i-2].X, trail[i-1].Y-trail[i-2].Y) / float64(max64(1, trail[i-1].T-trail[i-2].T))
+			dv1 := math.Hypot(trail[i-1].X-trail[i-2].X, trail[i-1].Y-trail[i-2].Y) / float64(max(int64(1), trail[i-1].T-trail[i-2].T))
 			dv2 := v
 			sign := 0
 			if dv2 > dv1*1.15 {
@@ -224,11 +222,4 @@ func (c *Captcha) scoreBehavior(trail []TrailPoint, sig *BehaviorSignals) (int, 
 		score = 100
 	}
 	return int(math.Round(score)), notes
-}
-
-func max64(a, b int64) int64 {
-	if a > b {
-		return a
-	}
-	return b
 }

@@ -126,18 +126,18 @@ func (DefaultGenerator) Generate(_ context.Context, req GenRequest) (*GenResult,
 
 	// 真缺口和假缺口用同一套质感，避免靠画法认出真缺口。
 	style := newHoleStyle(rnd)
-	drawHoleFrom(bg, mask, targetX, targetY, pw, ph, style, rnd, pristine, targetX, targetY)
+	sampleX, sampleY := distantSample(rnd, w, h, targetX, targetY, pw, ph)
+	drawHoleFrom(bg, mask, targetX, targetY, pw, ph, style, rnd, pristine, sampleX, sampleY)
 	trueRect := image.Rect(targetX, targetY, targetX+pw, targetY+ph)
 	pieceRect := image.Rect(pieceX, targetY, pieceX+pw, targetY+ph)
 	holes := []image.Rectangle{trueRect}
 	actualDecoys := 0
 	remaining := decoys
 
-	// 同排假缺口：同一行、同尺寸，轮廓轻微变化，颜色取各自位置的背景。
 	if remaining > 0 && sameRowSide >= 0 {
 		if dx, ok := sameRowDecoyX(w, targetX, targetY, pw, ph, pieceX, gap, sameRowSide); ok {
 			decoyMask := rasterPolygon(pw, ph, perturbPolygon(maskPts, pw, ph, rnd))
-			drawHole(bg, decoyMask, dx, targetY, pw, ph, style, rnd)
+			drawHole(bg, decoyMask, dx, targetY, pw, ph, style, rnd, pristine)
 			holes = append(holes, image.Rect(dx, targetY, dx+pw, targetY+ph))
 			actualDecoys++
 			remaining--
@@ -148,8 +148,8 @@ func (DefaultGenerator) Generate(_ context.Context, req GenRequest) (*GenResult,
 		var dx, dy int
 		ok := false
 		for tries := 0; tries < 48; tries++ {
-			dx = 12 + rnd.Intn(maxInt(1, w-pw-24))
-			dy = 12 + rnd.Intn(maxInt(1, h-ph-24))
+			dx = 12 + rnd.Intn(max(1, w-pw-24))
+			dy = 12 + rnd.Intn(max(1, h-ph-24))
 			r := image.Rect(dx, dy, dx+pw, dy+ph)
 			if tries < 32 && !(r.Min.Y < targetY-8 || r.Max.Y > targetY+ph+8) {
 				continue
@@ -176,7 +176,7 @@ func (DefaultGenerator) Generate(_ context.Context, req GenRequest) (*GenResult,
 		}
 		decoy := image.Rect(dx, dy, dx+pw, dy+ph)
 		decoyMask := polygonMaskN(pw, ph, rnd, 5+rnd.Intn(4))
-		drawHole(bg, decoyMask, dx, dy, pw, ph, style, rnd)
+		drawHole(bg, decoyMask, dx, dy, pw, ph, style, rnd, pristine)
 		holes = append(holes, decoy)
 		actualDecoys++
 	}
@@ -242,7 +242,7 @@ func paintBackground(rnd *rand.Rand, w, h int) *image.NRGBA {
 	}
 
 	for i := 0; i < 18+rnd.Intn(14); i++ {
-		radius := 8 + rnd.Float64()*float64(minInt(w, h))*0.42
+		radius := 8 + rnd.Float64()*float64(min(w, h))*0.42
 		cx := rnd.Float64() * float64(w)
 		cy := rnd.Float64() * float64(h)
 		col := hsv(math.Mod(hue+(rnd.Float64()-0.5)*140+360, 360), 0.26+rnd.Float64()*0.38, 0.74+rnd.Float64()*0.24)
@@ -389,22 +389,89 @@ func cutPiece(src *image.NRGBA, mask []uint8, tx, ty, pw, ph int) *image.NRGBA {
 			}
 			si := src.PixOffset(sx, sy)
 			di := dst.PixOffset(x, y)
-			r, g, b := src.Pix[si], src.Pix[si+1], src.Pix[si+2]
-
-			if isMaskEdge(mask, x, y, pw, ph) && cv >= 150 {
-				r = uint8(clamp8(int(float64(r)*0.55 + 255*0.45)))
-				g = uint8(clamp8(int(float64(g)*0.55 + 255*0.45)))
-				b = uint8(clamp8(int(float64(b)*0.55 + 255*0.45)))
-				cv = 245
-			}
-
-			dst.Pix[di] = r
-			dst.Pix[di+1] = g
-			dst.Pix[di+2] = b
+			dst.Pix[di] = src.Pix[si]
+			dst.Pix[di+1] = src.Pix[si+1]
+			dst.Pix[di+2] = src.Pix[si+2]
 			dst.Pix[di+3] = cv
 		}
 	}
 	return dst
+}
+
+// softenPiece 让下发的碎片不能直接当模板去背景里匹配：
+// 亚像素正弦形变、3x3 模糊、各通道色偏和噪点，轮廓 alpha 保持不变。
+func softenPiece(img *image.NRGBA, rnd *rand.Rand) *image.NRGBA {
+	w, h := img.Rect.Dx(), img.Rect.Dy()
+	// 预乘 alpha，形变和模糊时透明像素才不会把边缘拉黑。
+	pm := make([]float64, w*h*4)
+	for i := 0; i < len(img.Pix); i += 4 {
+		a := float64(img.Pix[i+3]) / 255
+		pm[i] = float64(img.Pix[i]) * a
+		pm[i+1] = float64(img.Pix[i+1]) * a
+		pm[i+2] = float64(img.Pix[i+2]) * a
+		pm[i+3] = a
+	}
+	at := func(x, y int) int { return (y*w + x) * 4 }
+	sample := func(sx, sy float64) [4]float64 {
+		sx = math.Max(0, math.Min(float64(w-1), sx))
+		sy = math.Max(0, math.Min(float64(h-1), sy))
+		x0, y0 := int(sx), int(sy)
+		x1, y1 := min(x0+1, w-1), min(y0+1, h-1)
+		tx, ty := sx-float64(x0), sy-float64(y0)
+		var out [4]float64
+		for c := 0; c < 4; c++ {
+			top := pm[at(x0, y0)+c]*(1-tx) + pm[at(x1, y0)+c]*tx
+			bot := pm[at(x0, y1)+c]*(1-tx) + pm[at(x1, y1)+c]*tx
+			out[c] = top*(1-ty) + bot*ty
+		}
+		return out
+	}
+
+	ampX := 0.6 + rnd.Float64()*0.6
+	ampY := 0.6 + rnd.Float64()*0.6
+	fx := 2 * math.Pi / float64(12+rnd.Intn(24))
+	fy := 2 * math.Pi / float64(12+rnd.Intn(24))
+	px := rnd.Float64() * 2 * math.Pi
+	py := rnd.Float64() * 2 * math.Pi
+	var kernel = [3][3]float64{{1, 2, 1}, {2, 4, 2}, {1, 2, 1}}
+
+	gainR := 0.88 + rnd.Float64()*0.24
+	gainG := 0.88 + rnd.Float64()*0.24
+	gainB := 0.88 + rnd.Float64()*0.24
+	offR := rnd.Float64()*16 - 8
+	offG := rnd.Float64()*16 - 8
+	offB := rnd.Float64()*16 - 8
+
+	out := image.NewNRGBA(img.Rect)
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			i := img.PixOffset(x, y)
+			if img.Pix[i+3] == 0 {
+				continue
+			}
+			var acc [4]float64
+			for ky := -1; ky <= 1; ky++ {
+				for kx := -1; kx <= 1; kx++ {
+					wt := kernel[kx+1][ky+1]
+					sx := float64(x+kx) + ampX*math.Sin(fy*float64(y)+py)
+					sy := float64(y+ky) + ampY*math.Sin(fx*float64(x)+px)
+					s := sample(sx, sy)
+					for c := 0; c < 4; c++ {
+						acc[c] += s[c] * wt
+					}
+				}
+			}
+			o := out.PixOffset(x, y)
+			if acc[3] > 1e-3 {
+				n := rnd.NormFloat64() * 3
+				out.Pix[o] = uint8(clamp8(int(acc[0]/acc[3]*gainR + offR + n)))
+				out.Pix[o+1] = uint8(clamp8(int(acc[1]/acc[3]*gainG + offG + n)))
+				out.Pix[o+2] = uint8(clamp8(int(acc[2]/acc[3]*gainB + offB + n)))
+			}
+			out.Pix[o+3] = img.Pix[i+3]
+		}
+	}
+	return out
 }
 
 func sameRowDecoyX(w, targetX, targetY, pw, ph, pieceX, gap, side int) (int, bool) {
@@ -466,21 +533,25 @@ func randomTargetX(rnd *rand.Rand, minTarget, maxTarget int) int {
 	return x
 }
 
-func drawHole(img *image.NRGBA, mask []uint8, tx, ty, pw, ph int, st holeStyle, rnd *rand.Rand) {
-	drawHoleFrom(img, mask, tx, ty, pw, ph, st, rnd, cloneNRGBA(img), tx, ty)
+func drawHole(img *image.NRGBA, mask []uint8, tx, ty, pw, ph int, st holeStyle, rnd *rand.Rand, src *image.NRGBA) {
+	sx, sy := distantSample(rnd, img.Rect.Dx(), img.Rect.Dy(), tx, ty, pw, ph)
+	drawHoleFrom(img, mask, tx, ty, pw, ph, st, rnd, src, sx, sy)
 }
 
+// 缺口亮度取本地，纹理从远处取。本地的原始像素一点不留，
+// 否则碎片本身就是缺口的像素级模板。
 func drawHoleFrom(img *image.NRGBA, mask []uint8, tx, ty, pw, ph int, st holeStyle, rnd *rand.Rand, src *image.NRGBA, sampleX, sampleY int) {
 	if src == nil {
 		src = img
 	}
 	w, h := img.Rect.Dx(), img.Rect.Dy()
-	avgR, avgG, avgB := regionAverage(src, sampleX, sampleY, pw, ph)
+	avgR, avgG, avgB := regionAverage(src, tx, ty, pw, ph)
 
 	for y := 0; y < ph; y++ {
 		for x := 0; x < pw; x++ {
 			cv := mask[y*pw+x]
-			if cv == 0 {
+			// 覆盖率太低的边缘像素直接不画，否则会透出本地背景。
+			if cv < 8 {
 				continue
 			}
 			dx, dy := tx+x, ty+y
@@ -489,7 +560,7 @@ func drawHoleFrom(img *image.NRGBA, mask []uint8, tx, ty, pw, ph int, st holeSty
 			}
 
 			alpha := float64(cv) / 255
-			if cv > 12 && cv < 243 {
+			if cv < 243 {
 				alpha += (rnd.Float64() - 0.5) * 0.22
 			}
 			if alpha < 0 {
@@ -517,6 +588,10 @@ func drawHoleFrom(img *image.NRGBA, mask []uint8, tx, ty, pw, ph int, st holeSty
 			r0 := float64(src.Pix[si])
 			g0 := float64(src.Pix[si+1])
 			b0 := float64(src.Pix[si+2])
+			// 边缘先铺远处采样色再叠缺口色，抗锯齿圈里也不能有本地像素。
+			if cv < 243 {
+				blendAt(img, dx, dy, color.NRGBA{R: uint8(r0), G: uint8(g0), B: uint8(b0), A: 255}, 1)
+			}
 			var r, g, b float64
 			if st.mode == 1 {
 				lum := 0.299*r0 + 0.587*g0 + 0.114*b0
@@ -534,7 +609,7 @@ func drawHoleFrom(img *image.NRGBA, mask []uint8, tx, ty, pw, ph int, st holeSty
 				G: uint8(clamp8(int(g))),
 				B: uint8(clamp8(int(b))),
 				A: 255,
-			}, alpha*0.86)
+			}, alpha)
 
 			if st.rimMode != 0 && isMaskEdge(mask, x, y, pw, ph) {
 				a := alpha * st.rimAlpha
@@ -545,6 +620,26 @@ func drawHoleFrom(img *image.NRGBA, mask []uint8, tx, ty, pw, ph int, st holeSty
 			}
 		}
 	}
+}
+
+// distantSample 挑一块离缺口足够远的区域当纹理来源。
+func distantSample(rnd *rand.Rand, w, h, tx, ty, pw, ph int) (int, int) {
+	minDist := max(pw, ph) + 16
+	for tries := 0; tries < 16; tries++ {
+		x := rnd.Intn(max(1, w-pw))
+		y := rnd.Intn(max(1, h-ph))
+		if absInt(x-tx) >= minDist || absInt(y-ty) >= minDist {
+			return x, y
+		}
+	}
+	return (tx + w/2) % max(1, w-pw), (ty + h/2) % max(1, h-ph)
+}
+
+func absInt(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
 
 type holeStyle struct {
@@ -600,7 +695,6 @@ func newHoleStyle(rnd *rand.Rand) holeStyle {
 		st.rimAlpha *= 0.6
 	}
 
-	st.texture = 0.12 + rnd.Float64()*0.22
 	st.offX = rnd.Intn(7) - 3
 	st.offY = rnd.Intn(7) - 3
 	if st.offX == 0 && st.offY == 0 {
@@ -609,7 +703,6 @@ func newHoleStyle(rnd *rand.Rand) holeStyle {
 	return st
 }
 
-// drawInterference 画一条穿过缺口边缘的干扰线。
 func drawInterference(img *image.NRGBA, rnd *rand.Rand, holes []image.Rectangle) {
 	for _, hole := range holes {
 		if rnd.Float64() < 0.2 {
@@ -877,18 +970,4 @@ func clamp8(v int) int {
 		return 255
 	}
 	return v
-}
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

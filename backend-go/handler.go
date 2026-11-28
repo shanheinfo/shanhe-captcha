@@ -70,7 +70,7 @@ func (c *Captcha) handleChallenge(w http.ResponseWriter, r *http.Request) {
 	}
 
 	key := c.ClientKey(r)
-	if !c.rl.allow("ch:" + c.ipKey(r)) {
+	if !c.rl.Allow("ch:" + c.ipKey(r)) {
 		c.emit(Event{Kind: "rate_limited", ClientKey: key, IP: c.clientIP(r), At: c.now()})
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": CodeRateLimited})
 		return
@@ -95,7 +95,7 @@ func (c *Captcha) handleVerify(w http.ResponseWriter, r *http.Request) {
 	}
 
 	key := c.ClientKey(r)
-	if !c.rl.allow("vf:" + c.ipKey(r)) {
+	if !c.rl.Allow("vf:" + c.ipKey(r)) {
 		c.emit(Event{Kind: "rate_limited", ClientKey: key, IP: c.clientIP(r), At: c.now()})
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": CodeRateLimited})
 		return
@@ -152,7 +152,6 @@ func (c *Captcha) applyCORS(w http.ResponseWriter, r *http.Request) bool {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 	} else {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
-		// 精确白名单模式下允许浏览器携带 cookie；"*" 模式不能带凭据。
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		w.Header().Set("Vary", "Origin")
 	}

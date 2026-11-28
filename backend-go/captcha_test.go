@@ -27,8 +27,9 @@ func newTestCaptcha(t *testing.T, mutate func(*Config)) (*Captcha, *httptest.Ser
 	cfg.MinSolveDuration = time.Nanosecond
 	cfg.Debug = true
 	cfg.RateLimit.Enabled = false
-	// 大部分用例只看位置和票据，行为评分单独测。
+	// 大部分用例只看位置和票据，行为评分和 PoW 单独测。
 	cfg.Behavior.Enabled = false
+	cfg.PoW.Enabled = false
 	if mutate != nil {
 		mutate(&cfg)
 	}
@@ -150,7 +151,6 @@ func TestFullFlow(t *testing.T) {
 	res := postVerify(t, srv, VerifyRequest{
 		ID:       ch.ID,
 		X:        answer,
-		Duration: 500,
 		Trail:    makeTrail(answer, 20),
 	})
 	if !res.OK {
@@ -181,7 +181,6 @@ func TestWrongPositionFails(t *testing.T) {
 	res := postVerify(t, srv, VerifyRequest{
 		ID:       ch.ID,
 		X:        answer + 30,
-		Duration: 500,
 		Trail:    makeTrail(answer+30, 20),
 	})
 	if res.OK || res.Code != CodeMismatch {
@@ -192,7 +191,6 @@ func TestWrongPositionFails(t *testing.T) {
 	res2 := postVerify(t, srv, VerifyRequest{
 		ID:       ch.ID,
 		X:        answer,
-		Duration: 600,
 		Trail:    makeTrail(answer, 20),
 	})
 	if res2.OK || res2.Code != CodeInvalid {
@@ -310,6 +308,45 @@ func TestRateLimit(t *testing.T) {
 	}
 	if codes[0] != 200 || codes[1] != 200 || codes[2] != http.StatusTooManyRequests {
 		t.Fatalf("限流结果不对: %v", codes)
+	}
+}
+
+type countingLimiter struct {
+	calls int
+	deny  bool
+}
+
+func (l *countingLimiter) Allow(string) bool {
+	l.calls++
+	return !l.deny
+}
+
+func TestCustomRateLimiter(t *testing.T) {
+	lim := &countingLimiter{}
+	_, srv := newTestCaptcha(t, func(cfg *Config) {
+		cfg.Limiter = lim
+	})
+	for i := 0; i < 2; i++ {
+		resp, err := srv.Client().Get(srv.URL + "/captcha/challenge")
+		if err != nil {
+			t.Fatalf("GET: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != 200 {
+			t.Fatalf("自定义限流器放行时应当 200，实际 %d", resp.StatusCode)
+		}
+	}
+	if lim.calls != 2 {
+		t.Fatalf("限流器应被调用 2 次，实际 %d", lim.calls)
+	}
+	lim.deny = true
+	resp, err := srv.Client().Get(srv.URL + "/captcha/challenge")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("限流器拒绝时应当 429，实际 %d", resp.StatusCode)
 	}
 }
 
@@ -548,7 +585,7 @@ func TestDefaultBodyLimitFitsMaxTrail(t *testing.T) {
 	for i := range tr {
 		tr[i] = TrailPoint{T: int64(i * 8), X: float64(i) * 0.1234, Y: 0.5}
 	}
-	body, err := json.Marshal(VerifyRequest{ID: "x", X: 123.45, Duration: 9999, Trail: tr})
+	body, err := json.Marshal(VerifyRequest{ID: "x", X: 123.45, Trail: tr})
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
@@ -811,6 +848,43 @@ func TestClientIPUsesFirstValidXFF(t *testing.T) {
 	}
 }
 
+func TestClientIPWithTrustedProxyCIDRs(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.TrustProxyHeaders = true
+	cfg.TrustedProxyCIDRs = []string{"10.0.0.0/8", "127.0.0.0/8"}
+	c, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer c.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "10.0.0.1:1234"
+	req.Header.Set("X-Forwarded-For", "1.2.3.4, 203.0.113.9")
+	if got := c.clientIP(req); got != "203.0.113.9" {
+		t.Fatalf("应取最右侧非可信 IP，实际 %q", got)
+	}
+
+	req.Header.Set("X-Forwarded-For", "203.0.113.9, 10.1.1.1")
+	if got := c.clientIP(req); got != "203.0.113.9" {
+		t.Fatalf("多级代理应跳过可信网段，实际 %q", got)
+	}
+
+	req.RemoteAddr = "198.51.100.7:1234"
+	req.Header.Set("X-Forwarded-For", "1.2.3.4")
+	if got := c.clientIP(req); got != "198.51.100.7" {
+		t.Fatalf("直连不应信任 XFF，实际 %q", got)
+	}
+}
+
+func TestTrustedProxyCIDRsRejectsInvalidEntry(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.TrustedProxyCIDRs = []string{"10.0.0.0/8", "not-a-cidr"}
+	if _, err := New(cfg); err == nil {
+		t.Fatal("非法网段应返回错误")
+	}
+}
+
 func TestCORSPreflightAllowsConfiguredHeaders(t *testing.T) {
 	_, srv := newTestCaptcha(t, func(cfg *Config) {
 		cfg.AllowOrigins = []string{"https://app.example"}
@@ -847,11 +921,11 @@ func TestMemoryStoreSetAfterClose(t *testing.T) {
 }
 
 func TestRateLimiterEvictsOldestBucket(t *testing.T) {
-	rl := newRateLimiter(RateLimitConfig{Enabled: true, Burst: 1, RefillPerSecond: 0.001, MaxKeys: 2})
+	rl := newMemoryRateLimiter(RateLimitConfig{Enabled: true, Burst: 1, RefillPerSecond: 0.001, MaxKeys: 2})
 	now := time.Now()
 	rl.buckets["old"] = &tokenBucket{tokens: 1, last: now.Add(-time.Minute), seen: now.Add(-time.Minute)}
 	rl.buckets["new"] = &tokenBucket{tokens: 1, last: now, seen: now}
-	if !rl.allow("third") {
+	if !rl.Allow("third") {
 		t.Fatal("新 key 应拿到令牌")
 	}
 	if _, ok := rl.buckets["old"]; ok {
