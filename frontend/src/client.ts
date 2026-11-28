@@ -22,7 +22,7 @@ function getClientId(): string {
   }
 }
 
-/** 返回设备标识请求头；业务接口也要带，否则凭证和客户端对不上。 */
+/** 业务请求也要带这个头，消费凭证时会核对。 */
 export function captchaClientHeader(): Record<string, string> {
   const id = getClientId()
   return id ? { 'X-Captcha-Client': id } : {}

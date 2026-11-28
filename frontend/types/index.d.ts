@@ -44,7 +44,6 @@ export interface VerifyPayload {
   id: string
   x: number
   y?: number
-  duration: number
   trail?: TrailPoint[]
   nonce?: string
   behavior?: BehaviorSignals
@@ -73,6 +72,7 @@ export interface CaptchaTexts {
   loading: string
   refresh: string
   networkError: string
+  tooManyRequests: string
 }
 
 export interface CaptchaClientOptions {

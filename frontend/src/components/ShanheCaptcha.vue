@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import { fetchChallenge, verifyChallenge } from '../client'
+import { CaptchaError, fetchChallenge, verifyChallenge } from '../client'
 import { solvePoW } from '../sha256'
 import { defaultTexts } from '../types'
 import type { BehaviorSignals, CaptchaTexts, Challenge, TrailPoint } from '../types'
@@ -117,7 +117,6 @@ const pieceStyle = computed(() => {
   }
 })
 
-let loadedAt = 0
 let abort: AbortController | null = null
 let failTimer: number | null = null
 let loadSeq = 0
@@ -143,6 +142,14 @@ function measure() {
 
 function isAbortError(err: unknown): boolean {
   return (err as DOMException)?.name === 'AbortError'
+}
+
+function isRateLimited(err: unknown): boolean {
+  return err instanceof CaptchaError && err.status === 429
+}
+
+function errorText(err: unknown): string {
+  return isRateLimited(err) ? t.value.tooManyRequests : t.value.networkError
 }
 
 async function refresh() {
@@ -175,14 +182,13 @@ async function refresh() {
     })
     if (seq !== loadSeq) return
     challenge.value = ch
-    loadedAt = performance.now()
     state.value = 'ready'
     await nextTick()
     measure()
   } catch (err) {
     if (seq !== loadSeq || isAbortError(err)) return
     state.value = 'error'
-    errorMsg.value = t.value.networkError
+    errorMsg.value = errorText(err)
     emit('error', err)
   }
 }
@@ -305,7 +311,7 @@ function onKeyDown(e: KeyboardEvent) {
   }
 }
 
-/** 键盘没有指针轨迹，这里生成一条直线。 */
+// 键盘没有指针轨迹，生成一条直线。
 function keyboardTrail(dest: number): TrailPoint[] {
   const n = 24
   const out: TrailPoint[] = []
@@ -343,7 +349,6 @@ function enterPlainStage(id: string) {
   offset.value = 0
   trail = []
   ticket.value = ''
-  loadedAt = performance.now()
   void nextTick().then(measure)
   emit('stage', 'plain')
 }
@@ -373,7 +378,6 @@ async function submit() {
     const payload = {
       id: c.id,
       x: offset.value,
-      duration: Math.round(performance.now() - loadedAt),
       trail: usedKeyboard ? keyboardTrail(offset.value) : trail,
       nonce,
       behavior,
@@ -405,9 +409,8 @@ async function submit() {
     }, 1100)
   } catch (err) {
     if (seq !== loadSeq || isAbortError(err)) return
-    // 不自动重试，交给用户点「换一张」。
     state.value = 'error'
-    errorMsg.value = t.value.networkError
+    errorMsg.value = errorText(err)
     emit('error', err)
   }
 }

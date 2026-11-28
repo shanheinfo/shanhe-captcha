@@ -80,13 +80,12 @@ function onPass(ticket: string) {
 import { fetchChallenge, verifyChallenge } from 'shanhe-captcha-vue'
 
 const ch = await fetchChallenge({ apiBase: '/captcha' })
-const res = await verifyChallenge({ id: ch.id, x: offset, duration, trail, behavior })
+const res = await verifyChallenge({ id: ch.id, x: offset, trail, behavior })
 
 if (res.next === 'plain') {
   const second = await verifyChallenge({
     id: res.nextId!,
     x: 100,
-    duration: 800,
     trail: secondTrail,
   })
 }
