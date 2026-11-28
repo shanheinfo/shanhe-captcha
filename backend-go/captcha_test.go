@@ -811,6 +811,43 @@ func TestClientIPUsesFirstValidXFF(t *testing.T) {
 	}
 }
 
+func TestClientIPWithTrustedProxyCIDRs(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.TrustProxyHeaders = true
+	cfg.TrustedProxyCIDRs = []string{"10.0.0.0/8", "127.0.0.0/8"}
+	c, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer c.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "10.0.0.1:1234"
+	req.Header.Set("X-Forwarded-For", "1.2.3.4, 203.0.113.9")
+	if got := c.clientIP(req); got != "203.0.113.9" {
+		t.Fatalf("应取最右侧非可信 IP，实际 %q", got)
+	}
+
+	req.Header.Set("X-Forwarded-For", "203.0.113.9, 10.1.1.1")
+	if got := c.clientIP(req); got != "203.0.113.9" {
+		t.Fatalf("多级代理应跳过可信网段，实际 %q", got)
+	}
+
+	req.RemoteAddr = "198.51.100.7:1234"
+	req.Header.Set("X-Forwarded-For", "1.2.3.4")
+	if got := c.clientIP(req); got != "198.51.100.7" {
+		t.Fatalf("直连不应信任 XFF，实际 %q", got)
+	}
+}
+
+func TestTrustedProxyCIDRsRejectsInvalidEntry(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.TrustedProxyCIDRs = []string{"10.0.0.0/8", "not-a-cidr"}
+	if _, err := New(cfg); err == nil {
+		t.Fatal("非法网段应返回错误")
+	}
+}
+
 func TestCORSPreflightAllowsConfiguredHeaders(t *testing.T) {
 	_, srv := newTestCaptcha(t, func(cfg *Config) {
 		cfg.AllowOrigins = []string{"https://app.example"}

@@ -2,6 +2,7 @@ package shanhecaptcha
 
 import (
 	"log/slog"
+	"net"
 	"runtime"
 	"strings"
 	"time"
@@ -49,6 +50,9 @@ type Config struct {
 	ClientIPPrefixV4  int
 	ClientIPPrefixV6  int
 	TrustProxyHeaders bool
+	// TrustedProxyCIDRs 非空时只信任这些网段发来的 X-Forwarded-For，
+	// 从右往左取第一个不在网段内的 IP，此时 TrustProxyHeaders 不生效。
+	TrustedProxyCIDRs []string
 
 	VerifyTrail     bool
 	MinTrailPoints  int
@@ -73,6 +77,8 @@ type Config struct {
 	Logger  *slog.Logger
 	Debug   bool
 	OnEvent func(Event)
+
+	trustedProxies []*net.IPNet
 }
 
 func DefaultConfig() Config {

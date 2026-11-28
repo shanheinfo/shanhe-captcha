@@ -140,7 +140,8 @@ _ = info
 | `PoW` | 关闭 | 打开后前端要先算一个 nonce |
 | `AllowOrigins` | 空 | 前后端分开时填前端域名 |
 | `AllowHeaders` | Content-Type、X-Captcha-Client、Authorization | 跨域请求允许的头 |
-| `TrustProxyHeaders` | false | 只有服务在可信反向代理后面时才开 |
+| `TrustProxyHeaders` | false | 信任 `X-Forwarded-For` 第一个 IP 和 `X-Real-IP`，要求代理覆盖而不是追加 XFF |
+| `TrustedProxyCIDRs` | 空 | 可信代理网段。填了以后只信这些网段发来的 XFF，从右往左取第一个非可信 IP |
 | `Debug` | false | 失败时返回具体原因 |
 
 ## 更换存储

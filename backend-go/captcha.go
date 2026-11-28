@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"image"
 	"image/jpeg"
 	"image/png"
@@ -44,6 +45,12 @@ type Captcha struct {
 // New 创建验证码实例。
 func New(cfg Config) (*Captcha, error) {
 	cfg.normalize()
+
+	proxies, err := parseTrustedProxies(cfg.TrustedProxyCIDRs)
+	if err != nil {
+		return nil, err
+	}
+	cfg.trustedProxies = proxies
 
 	seed := time.Now().UnixNano()
 	if n, err := rand.Int(rand.Reader, big.NewInt(1<<62)); err == nil {
@@ -83,15 +90,34 @@ func (c *Captcha) ClientKey(r *http.Request) string {
 	return hex.EncodeToString(sum[:12])
 }
 
-// ipKey 只按 IP 段生成限流 key。
-// 不能使用 ClientKey，UA 和设备 ID 都可以随便换。
+// ipKey 只按 IP 段限流，UA 和设备 ID 都能换。
 func (c *Captcha) ipKey(r *http.Request) string {
 	return prefixIP(c.clientIP(r), c.cfg.ClientIPPrefixV4, c.cfg.ClientIPPrefixV6)
 }
 
 func (c *Captcha) clientIP(r *http.Request) string {
+	remote := r.RemoteAddr
+	if host, _, err := net.SplitHostPort(remote); err == nil {
+		remote = host
+	}
+
+	if len(c.cfg.trustedProxies) > 0 {
+		if !ipInNets(remote, c.cfg.trustedProxies) {
+			return remote
+		}
+		for _, line := range r.Header.Values("X-Forwarded-For") {
+			entries := strings.Split(line, ",")
+			for i := len(entries) - 1; i >= 0; i-- {
+				ip := strings.TrimSpace(entries[i])
+				if net.ParseIP(ip) != nil && !ipInNets(ip, c.cfg.trustedProxies) {
+					return ip
+				}
+			}
+		}
+		return remote
+	}
+
 	if c.cfg.TrustProxyHeaders {
-		// X-Forwarded-For 只取第一个合法 IP。
 		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 			for _, part := range strings.Split(xff, ",") {
 				ip := strings.TrimSpace(part)
@@ -104,11 +130,39 @@ func (c *Captcha) clientIP(r *http.Request) string {
 			return xr
 		}
 	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
+	return remote
+}
+
+func parseTrustedProxies(cidrs []string) ([]*net.IPNet, error) {
+	if len(cidrs) == 0 {
+		return nil, nil
 	}
-	return host
+	nets := make([]*net.IPNet, 0, len(cidrs))
+	for _, s := range cidrs {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		_, n, err := net.ParseCIDR(s)
+		if err != nil {
+			return nil, fmt.Errorf("shanhecaptcha: bad TrustedProxyCIDRs %q", s)
+		}
+		nets = append(nets, n)
+	}
+	return nets, nil
+}
+
+func ipInNets(s string, nets []*net.IPNet) bool {
+	ip := net.ParseIP(s)
+	if ip == nil {
+		return false
+	}
+	for _, n := range nets {
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 func prefixIP(ip string, v4bits, v6bits int) string {
