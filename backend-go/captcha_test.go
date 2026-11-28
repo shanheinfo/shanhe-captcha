@@ -920,6 +920,21 @@ func TestMemoryStoreSetAfterClose(t *testing.T) {
 	}
 }
 
+func TestHeadChallengeDoesNotGenerate(t *testing.T) {
+	c, srv := newTestCaptcha(t, nil)
+	resp, err := srv.Client().Head(srv.URL + "/captcha/challenge")
+	if err != nil {
+		t.Fatalf("HEAD: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("HEAD 应当 200，实际 %d", resp.StatusCode)
+	}
+	if n := c.Store().(*MemoryStore).Len(); n != 0 {
+		t.Fatalf("HEAD 不应生成挑战，存储里有 %d 条", n)
+	}
+}
+
 func TestCloseKeepsExternalStore(t *testing.T) {
 	store := NewMemoryStore()
 	defer store.Close()
