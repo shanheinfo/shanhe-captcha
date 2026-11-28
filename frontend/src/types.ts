@@ -49,8 +49,6 @@ export interface VerifyPayload {
   id: string
   x: number
   y?: number
-  /** 客户端上报耗时（毫秒） */
-  duration: number
   trail?: TrailPoint[]
   nonce?: string
   behavior?: BehaviorSignals

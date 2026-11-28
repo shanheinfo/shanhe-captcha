@@ -117,7 +117,6 @@ const pieceStyle = computed(() => {
   }
 })
 
-let loadedAt = 0
 let abort: AbortController | null = null
 let failTimer: number | null = null
 let loadSeq = 0
@@ -183,7 +182,6 @@ async function refresh() {
     })
     if (seq !== loadSeq) return
     challenge.value = ch
-    loadedAt = performance.now()
     state.value = 'ready'
     await nextTick()
     measure()
@@ -351,7 +349,6 @@ function enterPlainStage(id: string) {
   offset.value = 0
   trail = []
   ticket.value = ''
-  loadedAt = performance.now()
   void nextTick().then(measure)
   emit('stage', 'plain')
 }
@@ -381,7 +378,6 @@ async function submit() {
     const payload = {
       id: c.id,
       x: offset.value,
-      duration: Math.round(performance.now() - loadedAt),
       trail: usedKeyboard ? keyboardTrail(offset.value) : trail,
       nonce,
       behavior,

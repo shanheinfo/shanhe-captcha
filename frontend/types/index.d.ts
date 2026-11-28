@@ -44,7 +44,6 @@ export interface VerifyPayload {
   id: string
   x: number
   y?: number
-  duration: number
   trail?: TrailPoint[]
   nonce?: string
   behavior?: BehaviorSignals
