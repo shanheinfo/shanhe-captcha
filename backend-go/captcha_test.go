@@ -920,6 +920,59 @@ func TestMemoryStoreSetAfterClose(t *testing.T) {
 	}
 }
 
+func TestHeadChallengeDoesNotGenerate(t *testing.T) {
+	c, srv := newTestCaptcha(t, nil)
+	resp, err := srv.Client().Head(srv.URL + "/captcha/challenge")
+	if err != nil {
+		t.Fatalf("HEAD: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("HEAD 应当 200，实际 %d", resp.StatusCode)
+	}
+	if n := c.Store().(*MemoryStore).Len(); n != 0 {
+		t.Fatalf("HEAD 不应生成挑战，存储里有 %d 条", n)
+	}
+}
+
+func TestCloseKeepsExternalStore(t *testing.T) {
+	store := NewMemoryStore()
+	defer store.Close()
+	cfg := DefaultConfig()
+	cfg.Store = store
+	c, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if err := c.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if err := store.Set(context.Background(), "k", []byte("v"), time.Minute); err != nil {
+		t.Fatalf("外部存储不应被关闭: %v", err)
+	}
+}
+
+func TestMemoryStoreGetReturnsCopy(t *testing.T) {
+	s := NewMemoryStore()
+	defer s.Close()
+	ctx := context.Background()
+	if err := s.Set(ctx, "k", []byte("original"), time.Minute); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	got, err := s.Get(ctx, "k")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	got[0] = 'X'
+	again, err := s.Get(ctx, "k")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if string(again) != "original" {
+		t.Fatalf("改动 Get 返回值不应影响存储，实际 %q", again)
+	}
+}
+
 func TestRateLimiterEvictsOldestBucket(t *testing.T) {
 	rl := newMemoryRateLimiter(RateLimitConfig{Enabled: true, Burst: 1, RefillPerSecond: 0.001, MaxKeys: 2})
 	now := time.Now()

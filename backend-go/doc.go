@@ -4,7 +4,7 @@ package shanhecaptcha
 
 import "errors"
 
-const Version = "0.1.1"
+const Version = "0.1.2"
 
 var (
 	ErrTicketInvalid  = errors.New("shanhecaptcha: ticket invalid")
