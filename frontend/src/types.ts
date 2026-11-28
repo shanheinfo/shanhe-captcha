@@ -81,6 +81,7 @@ export interface CaptchaTexts {
   loading: string
   refresh: string
   networkError: string
+  tooManyRequests: string
 }
 
 export const defaultTexts: CaptchaTexts = {
@@ -95,6 +96,7 @@ export const defaultTexts: CaptchaTexts = {
   loading: '加载中',
   refresh: '换一张',
   networkError: '网络异常，请重试',
+  tooManyRequests: '操作过于频繁，稍后再试',
 }
 
 export interface ShanheCaptchaProps {

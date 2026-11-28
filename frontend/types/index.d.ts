@@ -73,6 +73,7 @@ export interface CaptchaTexts {
   loading: string
   refresh: string
   networkError: string
+  tooManyRequests: string
 }
 
 export interface CaptchaClientOptions {
