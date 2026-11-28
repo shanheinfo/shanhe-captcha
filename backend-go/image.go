@@ -133,7 +133,6 @@ func (DefaultGenerator) Generate(_ context.Context, req GenRequest) (*GenResult,
 	actualDecoys := 0
 	remaining := decoys
 
-	// 同排假缺口：同一行、同尺寸，轮廓轻微变化，颜色取各自位置的背景。
 	if remaining > 0 && sameRowSide >= 0 {
 		if dx, ok := sameRowDecoyX(w, targetX, targetY, pw, ph, pieceX, gap, sameRowSide); ok {
 			decoyMask := rasterPolygon(pw, ph, perturbPolygon(maskPts, pw, ph, rnd))
@@ -600,7 +599,6 @@ func newHoleStyle(rnd *rand.Rand) holeStyle {
 		st.rimAlpha *= 0.6
 	}
 
-	st.texture = 0.12 + rnd.Float64()*0.22
 	st.offX = rnd.Intn(7) - 3
 	st.offY = rnd.Intn(7) - 3
 	if st.offX == 0 && st.offY == 0 {
@@ -609,7 +607,6 @@ func newHoleStyle(rnd *rand.Rand) holeStyle {
 	return st
 }
 
-// drawInterference 画一条穿过缺口边缘的干扰线。
 func drawInterference(img *image.NRGBA, rnd *rand.Rand, holes []image.Rectangle) {
 	for _, hole := range holes {
 		if rnd.Float64() < 0.2 {
